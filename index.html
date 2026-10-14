@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>Bschat — Premium Messaging</title>
+
+  <!-- Tailwind CSS 4 + DaisyUI -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5.0.0/dist/full.min.css" rel="stylesheet" type="text/css" />
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- GSAP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+  <style>
+    :root {
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * {
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: #0f172a;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+
+    /* App shell */
+    #app {
+      height: 100dvh;
+      max-width: 480px;
+      margin: 0 auto;
+      position: relative;
+      overflow: hidden;
+      background: #0f172a;
+      box-shadow: 0 0 40px rgba(0,0,0,0.5);
+    }
+
+    /* Landscape adaptation */
+    @media (orientation: landscape) and (max-height: 500px) {
+      #app {
+        max-width: 100%;
+        display: flex;
+        flex-direction: row;
+      }
+      .landscape-sidebar {
+        width: 320px;
+        min-width: 280px;
+        border-right: 1px solid #1e293b;
+        display: flex !important;
+        flex-direction: column;
+      }
+      .landscape-main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+      .bottom-nav {
+        display: none !important;
+      }
+      .landscape-nav {
+        display: flex !important;
+      }
+    }
+
+    @media (orientation: portrait), (min-height: 501px) {
+      .landscape-sidebar { display: none !important; }
+      .landscape-nav { display: none !important; }
+    }
+
+    /* Screens */
+    .screen {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      background: #0f172a;
+      transform: translateX(100%);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+    .screen.active {
+      transform: translateX(0);
+      opacity: 1;
+      pointer-events: auto;
+      z-index: 20;
+    }
+    .screen.slide-out-left {
+      transform: translateX(-30%);
+      opacity: 0.6;
+    }
+
+    /* Message bubbles */
+    .msg-bubble {
+      max-width: 78%;
+      padding: 10px 14px;
+      border-radius: 18px;
+      font-size: 15px;
+      line-height: 1.4;
+      position: relative;
+      word-wrap: break-word;
+    }
+    .msg-out {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      border-bottom-right-radius: 4px;
+      margin-left: auto;
+    }
+    .msg-in {
+      background: #1e293b;
+      color: #e2e8f0;
+      border-bottom-left-radius: 4px;
+      margin-right: auto;
+    }
+    .msg-time {
+      font-size: 11px;
+      opacity: 0.7;
+      margin-top: 4px;
+      text-align: right;
+    }
+
+    /* Online indicator */
+    .online-dot {
+      width: 12px;
+      height: 12px;
+      background: #22c55e;
+      border: 2px solid #0f172a;
+      border-radius: 50%;
+      position: absolute;
+      bottom: 0;
+      right: 0;
+    }
+
+    /* Unread badge */
+    .badge-unread {
+      min-width: 20px;
+      height: 20px;
+      background: #3b82f6;
+      color: white;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 6px;
+    }
+
+    /* Bottom nav */
+    .bottom-nav {
+      height: calc(64px + var(--safe-bottom));
+      padding-bottom: var(--safe-bottom);
+      background: #0f172aee;
+      backdrop-filter: blur(12px);
+      border-top: 1px solid #1e293b;
+    }
+
+    /* Status rings */
+    .status-ring {
+      padding: 2px;
+      background: linear-gradient(45deg, #f59e0b, #ef4444, #8b5cf6);
+      border-radius: 50%;
+    }
+    .status-ring.viewed {
+      background: #475569;
+    }
+
+    /* Banking cards */
+    .bank-card {
+      background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .bank-card::before {
+      content: "";
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 200px;
+      height: 200px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 50%;
+    }
+
+    /* Smooth transitions */
+    .transition-screen {
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease;
+    }
+
+    /* Input area */
+    .chat-input-area {
+      background: #0f172a;
+      border-top: 1px solid #1e293b;
+      padding-bottom: max(12px, var(--safe-bottom));
+    }
+
+    /* Hide scrollbar but keep functionality */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    /* Pulse animation for live */
+    @keyframes pulse-live {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .live-pulse { animation: pulse-live 1.5s infinite; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100">
+  <div id="app" class="relative">
+
+    <!-- ========== LANDSCAPE SIDEBAR (Chats always visible) ========== -->
+    <div class="landscape-sidebar bg-slate-900 flex-col h-full">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <h1 class="text-xl font-bold tracking-tight">Bschat</h1>
+        <div class="flex items-center gap-2">
+          <span id="clock-landscape" class="text-xs text-slate-400 font-mono"></span>
+          <button class="btn btn-ghost btn-sm btn-circle" onclick="showScreen('profile')">
+            <i data-lucide="user" class="w-5 h-5"></i>
+          </button>
+        </div>
+      </div>
+      <div class="flex-1 overflow-y-auto no-scrollbar" id="landscape-chat-list"></div>
+      <div class="landscape-nav p-2 border-t border-slate-800 flex justify-around">
+        <button class="btn btn-ghost btn-sm flex-col gap-0.5 h-auto py-2" data-nav="chats" onclick="switchTab('chats')">
+          <i data-lucide="message-circle" class="w-5 h-5"></i>
+          <span class="text-[10px]">Chats</span>
+        </button>
+        <button class="btn btn-ghost btn-sm flex-col gap-0.5 h-auto py-2" data-nav="status" onclick="switchTab('status')">
+          <i data-lucide="circle-dot" class="w-5 h-5"></i>
+          <span class="text-[10px]">Status</span>
+        </button>
+        <button class="btn btn-ghost btn-sm flex-col gap-0.5 h-auto py-2" data-nav="calls" onclick="switchTab('calls')">
+          <i data-lucide="phone" class="w-5 h-5"></i>
+          <span class="text-[10px]">Calls</span>
+        </button>
+        <button class="btn btn-ghost btn-sm flex-col gap-0.5 h-auto py-2" data-nav="banking" onclick="switchTab('banking')">
+          <i data-lucide="wallet" class="w-5 h-5"></i>
+          <span class="text-[10px]">Bank</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ========== MAIN CONTENT AREA ========== -->
+    <div class="landscape-main relative flex-1 h-full">
+
+      <!-- ========== CHATS SCREEN ========== -->
+      <div id="screen-chats" class="screen active transition-screen">
+        <!-- Header -->
+        <header class="px-4 pt-[calc(12px+var(--safe-top))] pb-3 flex items-center justify-between bg-slate-900/80 backdrop-blur-md border-b border-slate-800 z-30">
+          <div>
+            <h1 class="text-2xl font-bold tracking-tight">Bschat</h1>
+            <p class="text-xs text-slate-400" id="clock">--:--</p>
+          </div>
+          <div class="flex items-center gap-1">
+            <button class="btn btn-ghost btn-circle btn-sm" onclick="alert('Search coming soon')">
+              <i data-lucide="search" class="w-5 h-5"></i>
+            </button>
+            <button class="btn btn-ghost btn-circle btn-sm" onclick="showScreen('profile')">
+              <i data-lucide="more-vertical" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </header>
+
+        <!-- Chat List -->
+        <div class="flex-1 overflow-y-auto no-scrollbar pb-20" id="chat-list"></div>
+      </div>
+
+      <!-- ========== CONVERSATION SCREEN ========== -->
+      <div id="screen-chat" class="screen transition-screen">
+        <header class="px-3 pt-[calc(8px+var(--safe-top))] pb-2 flex items-center gap-3 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 z-30">
+          <button class="btn btn-ghost btn-circle btn-sm" onclick="goBack()">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+          </button>
+          <div class="relative flex-shrink-0">
+            <img id="chat-avatar" src="" class="w-10 h-10 rounded-full object-cover" alt="" />
+            <div id="chat-online" class="online-dot hidden"></div>
+          </div>
+          <div class="flex-1 min-w-0" onclick="showContactInfo()">
+            <h2 id="chat-name" class="font-semibold text-[15px] truncate"></h2>
+            <p id="chat-status" class="text-xs text-slate-400 truncate"></p>
+          </div>
+          <button class="btn btn-ghost btn-circle btn-sm" onclick="startCall('voice')">
+            <i data-lucide="phone" class="w-5 h-5"></i>
+          </button>
+          <button class="btn btn-ghost btn-circle btn-sm" onclick="startCall('video')">
+            <i data-lucide="video" class="w-5 h-5"></i>
+          </button>
+        </header>
+
+        <div id="messages" class="flex-1 overflow-y-auto no-scrollbar px-3 py-4 space-y-3"></div>
+
+        <div class="chat-input-area px-3 pt-2">
+          <div class="flex items-end gap-2">
+            <button class="btn btn-ghost btn-circle btn-sm mb-1" onclick="attachFile()">
+              <i data-lucide="paperclip" class="w-5 h-5"></i>
+            </button>
+            <div class="flex-1 relative">
+              <input id="msg-input" type="text" placeholder="Message..." 
+                class="input input-bordered w-full bg-slate-800 border-slate-700 focus:border-blue-500 rounded-full text-sm h-11 pr-12"
+                onkeydown="if(event.key==='Enter') sendMessage()" />
+              <button class="absolute right-2 top-1/2 -translate-y-1/2 btn btn-ghost btn-circle btn-xs" onclick="toggleEmoji()">
+                <i data-lucide="smile" class="w-5 h-5"></i>
+              </button>
+            </div>
+            <button id="send-btn" class="btn btn-primary btn-circle mb-1" onclick="sendMessage()">
+              <i data-lucide="send" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== STATUS SCREEN ========== -->
+      <div id="screen-status" class="screen transition-screen">
+        <header class="px-4 pt-[calc(12px+var(--safe-top))] pb-3 flex items-center justify-between bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
+          <h1 class="text-2xl font-bold">Status</h1>
+          <button class="btn btn-ghost btn-circle btn-sm" onclick="createStatus()">
+            <i data-lucide="camera" class="w-5 h-5"></i>
+          </button>
+        </header>
+
+        <div class="flex-1 overflow-y-auto no-scrollbar pb-20">
+          <!-- My Status -->
+          <div class="p-4 border-b border-slate-800">
+            <div class="flex items-center gap-4" onclick="createStatus()">
+              <div class="relative">
+                <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=You" class="w-14 h-14 rounded-full" alt="You" />
+                <div class="absolute -bottom-1 -right-1 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center border-2 border-slate-900">
+                  <i data-lucide="plus" class="w-3.5 h-3.5 text-white"></i>
+                </div>
+              </div>
+              <div>
+                <p class="font-semibold">My Status</p>
+                <p class="text-sm text-slate-400">Tap to add status update</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Updates -->
+          <div class="px-4 pt-4">
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Recent updates</p>
+            <div id="status-list" class="space-y-4"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== CALLS SCREEN ========== -->
+      <div id="screen-calls" class="screen transition-screen">
+        <header class="px-4 pt-[calc(12px+var(--safe-top))] pb-3 flex items-center justify-between bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
+          <h1 class="text-2xl font-bold">Calls</h1>
+          <button class="btn btn-ghost btn-circle btn-sm" onclick="startCall('voice')">
+            <i data-lucide="phone-call" class="w-5 h-5"></i>
+          </button>
+        </header>
+
+        <div class="flex-1 overflow-y-auto no-scrollbar pb-20" id="call-list"></div>
+      </div>
+
+      <!-- ========== BANKING SCREEN ========== -->
+      <div id="screen-banking" class="screen transition-screen">
+        <header class="px-4 pt-[calc(12px+var(--safe-top))] pb-3 flex items-center justify-between bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
+          <h1 class="text-2xl font-bold">Banking</h1>
+          <button class="btn btn-ghost btn-circle btn-sm" onclick="showNotifications()">
+            <i data-lucide="bell" class="w-5 h-5"></i>
+          </button>
+        </header>
+
+        <div class="flex-1 overflow-y-auto no-scrollbar pb-20 px-4 pt-4 space-y-5">
+          <!-- Balance Card -->
+          <div class="bank-card p-5 text-white shadow-xl">
+            <div class="flex justify-between items-start mb-6">
+              <div>
+                <p class="text-sm opacity-80">Total Balance</p>
+                <h2 class="text-3xl font-bold mt-1" id="balance">₦1,248,650.00</h2>
+              </div>
+              <i data-lucide="eye" class="w-5 h-5 opacity-70 cursor-pointer" onclick="toggleBalance()"></i>
+            </div>
+            <div class="flex justify-between items-end">
+              <div>
+                <p class="text-xs opacity-70">Account</p>
+                <p class="font-mono text-sm">**** 4829</p>
+              </div>
+              <div class="text-right">
+                <p class="text-xs opacity-70">Bschat Pay</p>
+                <p class="text-sm font-medium">Premium</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="grid grid-cols-4 gap-3">
+            <button class="flex flex-col items-center gap-2 p-3 rounded-2xl bg-slate-800/60 active:scale-95 transition" onclick="bankAction('send')">
+              <div class="w-12 h-12 rounded-full bg-blue-500/20 flex items-center justify-center">
+                <i data-lucide="send" class="w-5 h-5 text-blue-400"></i>
+              </div>
+              <span class="text-xs">Send</span>
+            </button>
+            <button class="flex flex-col items-center gap-2 p-3 rounded-2xl bg-slate-800/60 active:scale-95 transition" onclick="bankAction('request')">
+              <div class="w-12 h-12 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                <i data-lucide="download" class="w-5 h-5 text-emerald-400"></i>
+              </div>
+              <span class="text-xs">Request</span>
+            </button>
+            <button class="flex flex-col items-center gap-2 p-3 rounded-2xl bg-slate-800/60 active:scale-95 transition" onclick="bankAction('pay')">
+              <div class="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center">
+                <i data-lucide="qr-code" class="w-5 h-5 text-purple-400"></i>
+              </div>
+              <span class="text-xs">Pay</span>
+            </button>
+            <button class="flex flex-col items-center gap-2 p-3 rounded-2xl bg-slate-800/60 active:scale-95 transition" onclick="bankAction('more')">
+              <div class="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <i data-lucide="more-horizontal" class="w-5 h-5 text-amber-400"></i>
+              </div>
+              <span class="text-xs">More</span>
+            </button>
+          </div>
+
+          <!-- Recent Transactions -->
+          <div>
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="font-semibold">Recent Transactions</h3>
+              <button class="text-sm text-blue-400" onclick="viewAllTransactions()">See all</button>
+            </div>
+            <div id="transactions" class="space-y-3"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== PROFILE / SETTINGS ========== -->
+      <div id="screen-profile" class="screen transition-screen">
+        <header class="px-4 pt-[calc(12px+var(--safe-top))] pb-3 flex items-center gap-3 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
+          <button class="btn btn-ghost btn-circle btn-sm" onclick="goBack()">
+            <i data-lucide="arrow-left" class="w-5 h-5"></i>
+          </button>
+          <h1 class="text-xl font-bold">Profile</h1>
+        </header>
+        <div class="flex-1 overflow-y-auto no-scrollbar pb-10">
+          <div class="flex flex-col items-center pt-8 pb-6">
+            <div class="relative">
+              <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=You" class="w-24 h-24 rounded-full" alt="You" />
+              <button class="absolute bottom-0 right-0 w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center border-2 border-slate-900" onclick="editProfile()">
+                <i data-lucide="camera" class="w-4 h-4 text-white"></i>
+              </button>
+            </div>
+            <h2 class="text-xl font-bold mt-4">Lloyd Believe</h2>
+            <p class="text-slate-400 text-sm">+234 801 234 5678</p>
+            <p class="text-slate-500 text-xs mt-1">Available</p>
+          </div>
+
+          <div class="px-4 space-y-1">
+            <button class="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-slate-800/50 active:scale-[0.98] transition" onclick="editProfile()">
+              <i data-lucide="user" class="w-5 h-5 text-slate-400"></i>
+              <span class="flex-1 text-left">Edit Profile</span>
+              <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
+            </button>
+            <button class="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-slate-800/50 active:scale-[0.98] transition" onclick="toggleTheme()">
+              <i data-lucide="moon" class="w-5 h-5 text-slate-400"></i>
+              <span class="flex-1 text-left">Dark Mode</span>
+              <input type="checkbox" class="toggle toggle-primary toggle-sm" checked />
+            </button>
+            <button class="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-slate-800/50 active:scale-[0.98] transition" onclick="alert('Privacy settings')">
+              <i data-lucide="shield" class="w-5 h-5 text-slate-400"></i>
+              <span class="flex-1 text-left">Privacy</span>
+              <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
+            </button>
+            <button class="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-slate-800/50 active:scale-[0.98] transition" onclick="alert('Notifications')">
+              <i data-lucide="bell" class="w-5 h-5 text-slate-400"></i>
+              <span class="flex-1 text-left">Notifications</span>
+              <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
+            </button>
+            <button class="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-slate-800/50 active:scale-[0.98] transition" onclick="alert('Help & Support')">
+              <i data-lucide="help-circle" class="w-5 h-5 text-slate-400"></i>
+              <span class="flex-1 text-left">Help & Support</span>
+              <i data-lucide="chevron-right" class="w-4 h-4 text-slate-500"></i>
+            </button>
+            <button class="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-slate-800/50 active:scale-[0.98] transition text-red-400" onclick="alert('Logged out (demo)')">
+              <i data-lucide="log-out" class="w-5 h-5"></i>
+              <span class="flex-1 text-left">Log Out</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== BOTTOM NAVIGATION (Portrait) ========== -->
+      <nav class="bottom-nav absolute bottom-0 left-0 right-0 flex items-center justify-around z-40">
+        <button class="nav-btn flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition active:scale-95" data-tab="chats" onclick="switchTab('chats')">
+          <i data-lucide="message-circle" class="w-6 h-6"></i>
+          <span class="text-[10px] font-medium">Chats</span>
+        </button>
+        <button class="nav-btn flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition active:scale-95" data-tab="status" onclick="switchTab('status')">
+          <i data-lucide="circle-dot" class="w-6 h-6"></i>
+          <span class="text-[10px] font-medium">Status</span>
+        </button>
+        <button class="nav-btn flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition active:scale-95" data-tab="calls" onclick="switchTab('calls')">
+          <i data-lucide="phone" class="w-6 h-6"></i>
+          <span class="text-[10px] font-medium">Calls</span>
+        </button>
+        <button class="nav-btn flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition active:scale-95" data-tab="banking" onclick="switchTab('banking')">
+          <i data-lucide="wallet" class="w-6 h-6"></i>
+          <span class="text-[10px] font-medium">Bank</span>
+        </button>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-24 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-full text-sm shadow-lg opacity-0 pointer-events-none transition-opacity z-50 max-w-[90%] text-center"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
